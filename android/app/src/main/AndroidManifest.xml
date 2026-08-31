@@ -1,7 +1,11 @@
+
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
         android:label="App Territorio"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

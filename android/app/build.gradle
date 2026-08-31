@@ -4,9 +4,6 @@ plugins {
 }
 
 android {
-
-
-android {
     namespace "com.example.app_territorio"
     compileSdk 34
 
@@ -25,6 +22,3 @@ android {
     }
 }
 
-flutter {
-    source '../..'
-}

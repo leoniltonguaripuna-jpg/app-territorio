@@ -1,0 +1,103 @@
+import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+class AuthService {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // Função auxiliar para gerar um código curto único para a congregação
+  String _gerarCodigoCongregacao() {
+    final random = Random();
+    final numero = random.nextInt(900000) + 100000; // Gera 6 dígitos
+    return 'CGR-$numero';
+  }
+
+  /// 1. CRIAR UMA NOVA CONGREGAÇÃO E REGISTRAR O ADM
+  Future<String?> criarCongregacao({
+    required String nomeIrmao,
+    required String email,
+    required String senha,
+    required String nomeCongregacao,
+  }) async {
+    try {
+      // 1. Criar usuário no Firebase Auth
+      UserCredential userCred = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: senha,
+      );
+
+      String uid = userCred.user!.uid;
+      String codigoAcesso = _gerarCodigoCongregacao();
+
+      // 2. Criar a congregação no Firestore
+      DocumentReference docCongregacao = await _db.collection('congregacoes').add({
+        'nome': nomeCongregacao,
+        'codigoAcesso': codigoAcesso,
+        'criadoEm': FieldValue.serverTimestamp(),
+      });
+
+      // 3. Registrar o perfil do usuário associado a essa congregação
+      await _db.collection('usuarios').doc(uid).set({
+        'nome': nomeIrmao,
+        'email': email,
+        'congregacaoId': docCongregacao.id,
+        'funcao': 'admin', // Servo de territórios / Administrador
+        'criadoEm': FieldValue.serverTimestamp(),
+      });
+
+      return null; // Sucesso (sem mensagem de erro)
+    } on FirebaseAuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Erro inesperado: $e';
+    }
+  }
+
+  /// 2. ENTRAR EM UMA CONGREGAÇÃO EXISTENTE COM O CÓDIGO
+  Future<String?> entrarEmCongregacao({
+    required String nomeIrmao,
+    required String email,
+    required String senha,
+    required String codigoAcesso,
+  }) async {
+    try {
+      // 1. Buscar a congregação pelo código fornecido
+      var busca = await _db
+          .collection('congregacoes')
+          .where('codigoAcesso', isEqualTo: codigoAcesso.toUpperCase().trim())
+          .get();
+
+      if (busca.docs.isEmpty) {
+        return 'Código de congregação inválido ou não encontrado.';
+      }
+
+      String congregacaoId = busca.docs.first.id;
+
+      // 2. Criar usuário no Firebase Auth
+      UserCredential userCred = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: senha,
+      );
+
+      String uid = userCred.user!.uid;
+
+      // 3. Criar perfil do usuário vinculado à congregação encontrada
+      await _db.collection('usuarios').doc(uid).set({
+        'nome': nomeIrmao,
+        'email': email,
+        'congregacaoId': congregacaoId,
+        'funcao': 'dirigente', // Papel padrão inicial
+        'criadoEm': FieldValue.serverTimestamp(),
+      });
+
+      return null; // Sucesso
+    } on FirebaseAuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Erro inesperado: $e';
+    }
+  }
+}
+
+
